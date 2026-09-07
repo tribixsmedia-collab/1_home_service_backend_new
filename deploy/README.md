@@ -165,6 +165,8 @@ over HTTPS, with no certificate warning.
 
 ## 9. Check what is actually switched on
 
+Two checks. The first is Django’s own, on settings:
+
 ```bash
 cd /srv/homeservice
 sudo -u www-data venv/bin/python manage.py check --deploy
@@ -172,6 +174,25 @@ sudo -u www-data venv/bin/python manage.py check --deploy
 
 This should print **no warnings**. Any that appear are real in production —
 unlike on a development machine, where they are expected.
+
+The second calls each outside service and reports what is genuinely working:
+
+```bash
+sudo -u www-data venv/bin/python manage.py check_integrations
+```
+
+Every integration degrades rather than crashes when its keys are missing, which
+is why a half-configured server looks perfectly healthy. This is what tells
+them apart:
+
+- **LIVE** — a real call to the service succeeded
+- **FALLBACK** — deliberately not configured; it names what happens instead
+- **BROKEN** — configured, but the service refused us. Usually a wrong key
+
+With `DEBUG=False` it also treats fallbacks that would break real customers —
+login codes printing to a terminal, payments refusing — as problems, and exits
+non-zero. That makes it the natural last line of `deploy.sh` once the client's
+keys are in. Add `--offline` to skip the network calls.
 
 ## 10. Point the apps at the server
 
