@@ -1,0 +1,140 @@
+{% extends "legal/base.html" %}
+{% block title %}Privacy Policy{% endblock %}
+{% block heading %}Privacy Policy{% endblock %}
+{% block content %}
+
+<p>This policy explains what {{ company }} collects when you use our customer
+app, our vendor app or our website, why we collect it, and what you can ask us
+to do about it. It covers both apps, because they share one system.</p>
+
+<h2>What we collect</h2>
+
+<h3>If you book services as a customer</h3>
+<ul>
+  <li><strong>Your phone number.</strong> This is how you sign in — we send a
+      six-digit code to it. It is also how a vendor reaches you about a job.</li>
+  <li><strong>Your name</strong>, and your <strong>email address</strong> if
+      you choose to sign in by email instead.</li>
+  <li><strong>Your address</strong> — street address, state, district and
+      PIN code — so a vendor knows where to come.</li>
+  <li><strong>Your location</strong>, if you allow it. Used to show services
+      available near you and to fill in your address from a map pin. You can
+      refuse this and type your address instead; the app still works.</li>
+  <li><strong>What you book and view</strong> — your bookings, their status,
+      and the services you have looked at.</li>
+  <li><strong>Anything you upload</strong> — photographs, drawings or plans
+      attached to a project request, and messages you send to support.</li>
+</ul>
+
+<h3>If you work through us as a vendor</h3>
+
+<p>Everything above, and because we are paying you and putting you in front of
+customers:</p>
+<ul>
+  <li><strong>Identity and business documents</strong> — government ID proof,
+      address proof and trade certificates, so we can verify you are who you
+      say you are before sending you to somebody's home.</li>
+  <li><strong>Bank details</strong> — account holder name, account number,
+      IFSC code, and UPI ID if you give one, so your money can reach you.</li>
+  <li><strong>Where you work</strong> — the states and districts you cover.</li>
+  <li><strong>Job photographs</strong> you take to record work in progress.</li>
+</ul>
+
+<h3>What we never collect</h3>
+
+<p>We do not see or store your card number, UPI PIN, CVV, or bank password.
+When you pay, the payment screen belongs to Razorpay, not to us. We are told
+only whether a payment succeeded and a reference number for it.</p>
+
+<h2>Why we collect it</h2>
+
+<div class="scroll">
+<table>
+  <tr><th>What</th><th>Why</th></tr>
+  <tr><td>Phone number, email</td><td>To sign you in, and to send booking updates</td></tr>
+  <tr><td>Name, address, location</td><td>So a vendor can find you and the right services are shown</td></tr>
+  <tr><td>Booking and payment records</td><td>To run the job, release the vendor's money, handle refunds, and meet tax and accounting requirements</td></tr>
+  <tr><td>Vendor ID documents</td><td>To verify a vendor before they enter a customer's home</td></tr>
+  <tr><td>Vendor bank details</td><td>To pay vendors for completed work</td></tr>
+  <tr><td>Photographs you upload</td><td>To describe a job, and to record the work done</td></tr>
+  <tr><td>Notification token</td><td>To send you alerts about your bookings</td></tr>
+</table>
+</div>
+
+<h2>Who else sees it</h2>
+
+<p>We do not sell your information, and we do not share it for advertising.
+We use the following companies to run the service. Each receives only what it
+needs to do its job:</p>
+
+<div class="scroll">
+<table>
+  <tr><th>Company</th><th>What it handles</th></tr>
+  <tr><td>Razorpay</td><td>Payments, and transfers to vendors</td></tr>
+  <tr><td>Cloudinary</td><td>Storing and delivering photographs and video</td></tr>
+  <tr><td>Google (Firebase)</td><td>Sending notifications to your phone</td></tr>
+  <tr><td>Our SMS provider</td><td>Delivering your sign-in code</td></tr>
+  <tr><td>Amazon Web Services</td><td>Running our servers and sending our email</td></tr>
+  <tr><td>Our map provider</td><td>Showing maps and turning a pin into an address</td></tr>
+</table>
+</div>
+
+<p>A vendor assigned to your booking is shown your name, phone number and
+address, because they cannot do the work otherwise. They are not given your
+email or your payment details.</p>
+
+<p>We may also disclose information where the law requires it — a court order,
+a tax authority, or a lawful request from the police.</p>
+
+<h2>Where it is kept, and for how long</h2>
+
+<p>Our servers are in India. Photographs and video are held by Cloudinary,
+which may store them outside India.</p>
+
+<p>We keep your account and booking history while your account is open. If you
+close your account we delete your personal details, but we keep the financial
+record of completed bookings — the amount, the date and the invoice — because
+tax law requires us to. Vendor identity documents are deleted once they are no
+longer needed for verification.</p>
+
+<h2>How it is protected</h2>
+
+<p>The connection between the apps and our servers is encrypted. Vendor
+identity documents are deliberately <em>not</em> stored on a public image
+service: they sit on our own server and can only be opened by an administrator
+who has been granted access to them, one document at a time.</p>
+
+<p>No system is perfect. If we discover a breach affecting your personal
+information, we will tell you.</p>
+
+<h2>What you can ask us to do</h2>
+
+<ul>
+  <li><strong>See what we hold about you.</strong> Ask, and we will tell you.</li>
+  <li><strong>Correct it.</strong> Most of it you can edit yourself in the app.</li>
+  <li><strong>Delete it.</strong> See <a href="{% url 'data_deletion' %}">Delete
+      My Data</a> for how, and what we are obliged to keep.</li>
+  <li><strong>Withdraw permission</strong> for location or notifications, in
+      your phone's settings. The app keeps working without them.</li>
+</ul>
+
+<h2>Children</h2>
+
+<p>This service is not intended for anyone under 18, and we do not knowingly
+collect information from children. If you believe a child has given us
+information, write to us and we will remove it.</p>
+
+<h2>Changes</h2>
+
+<p>If we change this policy we will update the date at the top of this page,
+and tell you in the app if the change is significant.</p>
+
+<h2>Contact us</h2>
+
+<p>
+{% if contact_email %}Email: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a><br>{% endif %}
+{% if contact_phone %}Phone: {{ contact_phone }}<br>{% endif %}
+{% if address %}{{ company }}<br>{{ address|linebreaksbr }}{% endif %}
+</p>
+
+{% endblock %}

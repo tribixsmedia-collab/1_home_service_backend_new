@@ -1,0 +1,93 @@
+{% comment %}
+  Public legal pages. Deliberately self-contained: no dashboard chrome, no
+  static-file dependencies, nothing behind a login. A Play reviewer opens these
+  in a signed-out browser and they must render on their own.
+
+  {# #} is single-line only in Django -- a multi-line one prints its contents
+  above the doctype, on the live page, which is how this note first shipped.
+  Use {% comment %} for anything spanning lines.
+
+  NOTE FOR WHOEVER MAINTAINS THIS: the wording describes what the software
+  actually does, checked against the models -- it is not a downloaded template.
+  It has NOT been reviewed by a lawyer. Before launch, have someone qualified
+  read it against how the business actually operates.
+{% endcomment %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{% endblock %} — {{ company }}</title>
+<style>
+  :root{
+    --ground:#ffffff; --ink:#1b2733; --soft:#5a6a7a; --line:#e2e8ef;
+    --accent:#1f5fd0; --warn-bg:#fdf3e3; --warn-line:#c8891f; --warn-ink:#7a5210;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --ground:#0e151d; --ink:#dfe7ef; --soft:#93a3b4; --line:#22303d;
+      --accent:#6ba5ff; --warn-bg:#2a1f0c; --warn-line:#c8891f; --warn-ink:#e8c07a;
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--ground); color:var(--ink);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:720px; margin:0 auto; padding:48px 20px 80px}
+  header{border-bottom:2px solid var(--ink); padding-bottom:16px; margin-bottom:32px}
+  .brand{font-size:13px; letter-spacing:.08em; text-transform:uppercase; color:var(--soft)}
+  h1{font-size:clamp(26px,5vw,34px); line-height:1.15; margin:8px 0 6px; text-wrap:balance}
+  .updated{color:var(--soft); font-size:14px; margin:0}
+  h2{font-size:20px; margin:36px 0 10px; line-height:1.3; text-wrap:balance}
+  h3{font-size:16px; margin:24px 0 6px}
+  p,li{color:var(--ink)}
+  p{margin:0 0 14px}
+  ul{margin:0 0 14px; padding-left:22px}
+  li{margin-bottom:7px}
+  a{color:var(--accent)}
+  strong{font-weight:600}
+  table{width:100%; border-collapse:collapse; margin:0 0 18px; font-size:15px}
+  th,td{text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top}
+  th{font-weight:600; white-space:nowrap}
+  .scroll{overflow-x:auto}
+  .note{
+    background:var(--warn-bg); border-left:3px solid var(--warn-line);
+    color:var(--warn-ink); padding:14px 16px; margin:0 0 28px; border-radius:0 3px 3px 0;
+  }
+  .note strong{color:inherit}
+  .note p:last-child{margin-bottom:0}
+  footer{margin-top:48px; padding-top:18px; border-top:1px solid var(--line);
+    color:var(--soft); font-size:14px}
+  footer a{margin-right:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">{{ company }}</div>
+    <h1>{% block heading %}{% endblock %}</h1>
+    {% if updated %}<p class="updated">Last updated {{ updated }}</p>{% endif %}
+  </header>
+
+  {% if placeholders %}
+  <div class="note">
+    <p><strong>This page is not finished.</strong> The contact address, postal
+    address or effective date has not been filled in yet, so it is not ready to
+    be submitted to an app store or relied on by a customer.</p>
+    <p>Set <code>LEGAL_CONTACT_EMAIL</code>, <code>LEGAL_ADDRESS</code> and
+    <code>LEGAL_LAST_UPDATED</code> in the server's <code>.env</code> and this
+    notice disappears.</p>
+  </div>
+  {% endif %}
+
+  {% block content %}{% endblock %}
+
+  <footer>
+    <a href="{% url 'privacy_policy' %}">Privacy Policy</a>
+    <a href="{% url 'terms_of_service' %}">Terms of Service</a>
+    <a href="{% url 'data_deletion' %}">Delete My Data</a>
+  </footer>
+</div>
+</body>
+</html>

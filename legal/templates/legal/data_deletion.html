@@ -1,0 +1,78 @@
+{% extends "legal/base.html" %}
+{% block title %}Delete My Data{% endblock %}
+{% block heading %}Deleting your account and data{% endblock %}
+{% block content %}
+
+<p>You can ask us to delete your account and the personal information attached
+to it. This page explains how, what goes, and what we are required to keep.</p>
+
+<h2>How to ask</h2>
+
+{% if contact_email %}
+<p>Email <a href="mailto:{{ contact_email }}?subject=Delete%20my%20account">{{ contact_email }}</a>
+from the email address on your account, or write from any address and include:</p>
+{% else %}
+<p>Write to us using the contact details on our
+<a href="{% url 'privacy_policy' %}">Privacy Policy</a> page, and include:</p>
+{% endif %}
+
+<ul>
+  <li>the <strong>phone number</strong> you sign in with</li>
+  <li>whether the account is a <strong>customer</strong> or <strong>vendor</strong> account</li>
+  <li>the words <strong>“delete my account”</strong></li>
+</ul>
+
+<p>We will confirm we have received your request, check that it really is your
+account, and complete the deletion <strong>within 30 days</strong>.</p>
+
+<p>You do not need the app installed to make this request, and there is no
+charge.</p>
+
+<h2>What gets deleted</h2>
+
+<ul>
+  <li>Your name, phone number and email address</li>
+  <li>Your address and any saved location</li>
+  <li>Your profile and sign-in credentials</li>
+  <li>Photographs and files you uploaded</li>
+  <li>Your notification tokens, so we stop contacting your phone</li>
+  <li>Your support messages</li>
+  <li><strong>Vendors:</strong> your identity documents and your bank details</li>
+</ul>
+
+<h2>What we have to keep, and why</h2>
+
+<p>We cannot delete everything, and it would be dishonest to imply otherwise.</p>
+
+<ul>
+  <li><strong>Records of completed bookings and payments</strong> — the amount,
+      the date and the invoice. Indian tax and accounting law requires a
+      business to retain these, normally for eight years. They are kept
+      separately from your profile, and the personal details attached to them
+      are reduced to what the law requires.</li>
+  <li><strong>Anything subject to an active dispute</strong> — a refund under
+      investigation, a complaint, or a legal claim — until it is resolved.</li>
+</ul>
+
+<p>Once those periods pass, the remaining records are deleted too.</p>
+
+<h2>If you are a vendor with money owed</h2>
+
+<p>Deleting your account does not cancel a payment we owe you. Tell us before
+you request deletion so any pending payout can be completed first — once the
+bank details are gone we cannot pay you without asking for them again.</p>
+
+<h2>Deleting is permanent</h2>
+
+<p>Once done, your booking history, saved addresses and reviews are gone and
+cannot be restored. Signing up again later creates a new, empty account.</p>
+
+<h2>Contact</h2>
+
+<p>
+{% if contact_email %}Email: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a><br>{% endif %}
+{% if contact_phone %}Phone: {{ contact_phone }}<br>{% endif %}
+{% if address %}{{ company }}<br>{{ address|linebreaksbr }}{% endif %}
+</p>
+
+{% endblock %}

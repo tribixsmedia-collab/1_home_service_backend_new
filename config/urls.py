@@ -6,6 +6,10 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from accounts.token_serializers import AppTokenObtainPairView
 
 urlpatterns = [
+    # Public legal pages: /privacy/, /terms/, /data-deletion/. Before the
+    # dashboard include so a page name can never be shadowed by it.
+    path('', include('legal.urls')),
+
     path('', include('dashboard.urls')),
     path('hjssjiasjci/', admin.site.urls),
 

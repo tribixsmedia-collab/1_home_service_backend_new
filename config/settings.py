@@ -80,6 +80,7 @@ INSTALLED_APPS = [
     'home_sections',
     'curations',
     'service_forms',
+    'legal',
     'reviews',
     'discounts',
     'dashboard',
@@ -333,6 +334,28 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # leaving it off merely means Django reads the file itself. Slower, never wrong.
 MEDIA_X_ACCEL_REDIRECT = config('MEDIA_X_ACCEL_REDIRECT', default=False, cast=bool)
 MEDIA_X_ACCEL_PREFIX = config('MEDIA_X_ACCEL_PREFIX', default='/protected-media/')
+
+
+# ---------- Public legal pages ----------
+# Company details for /privacy/, /terms/ and /data-deletion/. Kept in
+# configuration rather than the templates so the client's real address and
+# support address are set once at deploy time, not by editing and redeploying.
+#
+# Google Play checks the privacy policy URL, and its account-deletion policy
+# requires a public page describing how to request deletion.
+LEGAL_COMPANY_NAME = config('LEGAL_COMPANY_NAME', default='RNI Services')
+LEGAL_CONTACT_EMAIL = config('LEGAL_CONTACT_EMAIL', default='')
+LEGAL_CONTACT_PHONE = config('LEGAL_CONTACT_PHONE', default='')
+LEGAL_ADDRESS = config('LEGAL_ADDRESS', default='')
+LEGAL_LAST_UPDATED = config('LEGAL_LAST_UPDATED', default='')
+
+# A policy that still says "[your email]" is worse than no policy: Play reads
+# it, and a customer exercising a data right has nowhere to write. The pages
+# render a visible banner while anything is unset, so this cannot be missed by
+# a reviewer or by us.
+LEGAL_HAS_PLACEHOLDERS = not all([
+    LEGAL_CONTACT_EMAIL, LEGAL_ADDRESS, LEGAL_LAST_UPDATED,
+])
 
 # ---------- Cloudinary (image & video CDN) ----------
 # Uploads go to Cloudinary instead of this server's disk, and are delivered

@@ -1,0 +1,114 @@
+{% extends "legal/base.html" %}
+{% block title %}Terms of Service{% endblock %}
+{% block heading %}Terms of Service{% endblock %}
+{% block content %}
+
+<p>These terms apply when you use the {{ company }} apps or website, whether
+you are booking work or carrying it out.</p>
+
+<h2>What we do</h2>
+
+<p>{{ company }} connects customers who need home services with vendors who
+provide them. We are the platform. The work itself is done by an independent
+vendor, not by us and not by our employees.</p>
+
+<h2>Your account</h2>
+
+<ul>
+  <li>You must be 18 or older.</li>
+  <li>Sign-in is by a code sent to your phone or email. Keep access to that
+      number and address — anyone who can receive the code can enter your
+      account.</li>
+  <li>Give us accurate details. A wrong address means a vendor arrives at the
+      wrong door.</li>
+</ul>
+
+<h2>Bookings and prices</h2>
+
+<p>Prices are shown before you confirm. Some services are priced at a flat
+rate, others per hour, per square foot, per visit or per item — the app shows
+which applies and calculates the total from the quantity you enter.</p>
+
+<p>Some prices are estimates. Where the real quantity of work can only be
+judged on site, the final amount may differ, and any difference is agreed with
+you before the work proceeds.</p>
+
+<h2>Projects put out for quotes</h2>
+
+<p>For larger work you can describe a project and receive quotes from vendors.
+Accepting a quote <strong>holds</strong> it — it does not yet award the job.
+A confirmation fee, shown to you before you pay it, is charged to confirm; only
+then is the vendor told they have won the work.</p>
+
+<h2>Payment</h2>
+
+<ul>
+  <li>Payments are handled by Razorpay. We never see your card or UPI details.</li>
+  <li>Money you pay for a job is <strong>held</strong> and released to the
+      vendor after the job is marked complete — not at the moment you pay.</li>
+  <li>If a job is not done, or is done badly, tell us before confirming
+      completion. Money still held can be refunded in full.</li>
+</ul>
+
+<h2>Cancelling</h2>
+
+<p>You may cancel a booking before the vendor starts work. Where money has
+already been taken it is refunded to the original payment method; the bank
+usually takes 5–7 working days. Once work has begun, a cancellation is settled
+case by case according to what has already been done.</p>
+
+<h2>If you are a vendor</h2>
+
+<ul>
+  <li>You are an independent business, not our employee. You decide which jobs
+      to accept.</li>
+  <li>You must hold any licence or qualification your trade requires, and give
+      us truthful identity and business documents.</li>
+  <li>You are responsible for the quality and safety of your work, and for any
+      damage or injury it causes.</li>
+  <li>Your money is released after the job is marked complete, to the bank
+      account you have given us.</li>
+  <li>Repeated no-shows, fake documents or poor work can end your access to the
+      platform.</li>
+</ul>
+
+<h2>Reviews</h2>
+
+<p>Reviews must describe your own genuine experience. We remove reviews that
+are abusive, untrue, or written in exchange for payment.</p>
+
+<h2>What we are and are not responsible for</h2>
+
+<p>We are responsible for running the platform: taking your booking, holding
+your money safely, passing the job to a vendor and handling disputes fairly.</p>
+
+<p>We are not the ones doing the work. A vendor's workmanship, timekeeping and
+conduct are theirs. Where something goes wrong we will help you resolve it and,
+where money is still held, refund it — but we do not accept liability for a
+vendor's work beyond the amount you paid for that job.</p>
+
+<h2>Using the service properly</h2>
+
+<p>Do not use the apps to break the law, to harass anyone, to post content you
+have no right to, or to attempt to interfere with the service. We can suspend
+an account that does.</p>
+
+<h2>Changes to these terms</h2>
+
+<p>We may update these terms. The date at the top of this page changes when we
+do, and significant changes are announced in the app.</p>
+
+<h2>Governing law</h2>
+
+<p>These terms are governed by the laws of India, and disputes fall to the
+courts where {{ company }} is registered.</p>
+
+<h2>Contact</h2>
+
+<p>
+{% if contact_email %}Email: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a><br>{% endif %}
+{% if contact_phone %}Phone: {{ contact_phone }}<br>{% endif %}
+{% if address %}{{ company }}<br>{{ address|linebreaksbr }}{% endif %}
+</p>
+
+{% endblock %}
