@@ -14,11 +14,27 @@ one rather than taking a page down with it.
 
 import logging
 from datetime import datetime, timedelta, timezone as dt_timezone
+from typing import NamedTuple
 
 import requests
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
+
+class Place(NamedTuple):
+    """
+    What a geocoder found: the address to show, and the town to say it in.
+
+    `locality` exists for Plus Codes. "7M5237MC+37" is unambiguous but nobody
+    reads it out; "37MC+37, Chennai" is the same square in a form a customer
+    can repeat down a phone line, and the town half of that has to come from
+    the geocoder. It is '' when the geocoder did not name one.
+    """
+
+    address: str = ''
+    locality: str = ''
+
 
 CREATE_SESSION_URL = 'https://tile.googleapis.com/v1/createSession'
 GEOCODE_URL = 'https://maps.googleapis.com/maps/api/geocode/json'
@@ -85,17 +101,60 @@ def create_tile_session(api_key, map_type='roadmap', language='en-US', region='I
 # ---------------------------------------------------------------------------
 
 def reverse_geocode(api_key, latitude, longitude, language='en'):
-    """A readable address for a point, or None when Google has nothing."""
+    """A Place for a point, or None when Google has nothing there."""
+    data = _geocode_request(
+        {'latlng': f'{latitude},{longitude}', 'key': api_key, 'language': language}
+    )
+    if data is None:
+        return None
+
+    result = (data.get('results') or [None])[0]
+    if not result:
+        return None
+    return Place(
+        address=result.get('formatted_address') or '',
+        locality=_locality_from(result.get('address_components') or []),
+    )
+
+
+def geocode(api_key, query, language='en', region='in'):
+    """
+    Where a place name is, as (latitude, longitude), or None.
+
+    The one caller is Plus Code lookup: a customer who pastes
+    "37MC+37, Chennai" has given a code that only means something within a
+    degree or so of Chennai, so the town has to be turned into a point before
+    the code can be completed.
+    """
+    data = _geocode_request({
+        'address': query,
+        'key': api_key,
+        'language': language,
+        # Nudges ambiguous names towards this country rather than a namesake
+        # somewhere else. A hint only -- it does not exclude anywhere.
+        'region': region,
+    })
+    if data is None:
+        return None
+
+    result = (data.get('results') or [None])[0]
+    if not result:
+        return None
+    location = (result.get('geometry') or {}).get('location') or {}
     try:
-        response = requests.get(
-            GEOCODE_URL,
-            params={
-                'latlng': f'{latitude},{longitude}',
-                'key': api_key,
-                'language': language,
-            },
-            timeout=TIMEOUT,
-        )
+        return float(location['lat']), float(location['lng'])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _geocode_request(params):
+    """
+    One call to the Geocoding API. Returns the payload, or None for
+    ZERO_RESULTS; raises GoogleMapsError on anything else, so a key with the
+    API switched off is reported rather than read as "nowhere".
+    """
+    try:
+        response = requests.get(GEOCODE_URL, params=params, timeout=TIMEOUT)
         data = response.json()
     except (requests.RequestException, ValueError) as exc:
         raise GoogleMapsError(f'Could not reach Google ({exc.__class__.__name__}).')
@@ -107,11 +166,32 @@ def reverse_geocode(api_key, latitude, longitude, language='en'):
         raise GoogleMapsError(
             data.get('error_message') or f'Geocoding API said {status}.'
         )
+    return data
 
-    results = data.get('results') or []
-    if not results:
-        return None
-    return results[0].get('formatted_address')
+
+# Most specific first: a Plus Code reads best against the smallest place a
+# customer would still recognise the name of.
+LOCALITY_COMPONENTS = (
+    'locality',
+    'postal_town',
+    'sublocality',
+    'administrative_area_level_3',
+    'administrative_area_level_2',
+    'administrative_area_level_1',
+)
+
+
+def _locality_from(components):
+    """The town out of Google's address_components, or ''."""
+    by_type = {}
+    for component in components:
+        for component_type in component.get('types') or []:
+            by_type.setdefault(component_type, component.get('long_name') or '')
+
+    for component_type in LOCALITY_COMPONENTS:
+        if by_type.get(component_type):
+            return by_type[component_type]
+    return ''
 
 
 # ---------------------------------------------------------------------------

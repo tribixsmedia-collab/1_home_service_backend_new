@@ -3,6 +3,7 @@ from decimal import Decimal
 from rest_framework import serializers
 from services.pricing import line_total, parse_money
 from .models import Booking, JobStartPhoto
+from maps import plus_codes
 
 
 class BookingCreateSerializer(serializers.ModelSerializer):
@@ -74,6 +75,10 @@ class BookingListSerializer(serializers.ModelSerializer):
     form_name = serializers.SerializerMethodField()
     form_groups = serializers.SerializerMethodField()
     form_responses = serializers.SerializerMethodField()
+    # The pin as a Plus Code, for the vendor to paste into any maps app. Worked
+    # out from location_lat/location_lng on the way out rather than stored, so
+    # it cannot disagree with them.
+    plus_code = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
@@ -84,10 +89,13 @@ class BookingListSerializer(serializers.ModelSerializer):
             'preferred_date', 'preferred_time', 'status',
             'amount', 'payment_status', 'notes', 'services_json',
            'address_text', 'address_state', 'address_district', 'address_pincode',
-            'location_lat', 'location_lng',
+            'location_lat', 'location_lng', 'plus_code',
             'form_name', 'form_groups', 'form_responses',
             'created_at', 'assigned_at', 'completed_at',
         ]
+
+    def get_plus_code(self, obj):
+        return plus_codes.plus_code_for(obj.location_lat, obj.location_lng)
 
     def get_customer_name(self, obj):
         u = obj.customer.user

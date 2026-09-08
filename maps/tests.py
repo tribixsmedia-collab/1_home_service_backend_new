@@ -14,8 +14,9 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from . import plus_codes
 from .config import map_config, tile_session_for
-from .google import GoogleMapsError
+from .google import GoogleMapsError, Place
 from .models import MapSettings
 
 KEY = 'AIzaTestKey'
@@ -182,7 +183,8 @@ class ReverseGeocodeEndpointTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
 
-    @patch('maps.views._nominatim_reverse_geocode', return_value='12 Anna Salai, Chennai')
+    @patch('maps.views._nominatim_reverse_geocode',
+           return_value=Place('12 Anna Salai, Chennai', 'Chennai'))
     def test_uses_the_free_service_on_the_free_map(self, mock_free):
         response = self.client.get(self.url, {'lat': '13.08', 'lng': '80.27'})
 
@@ -191,7 +193,8 @@ class ReverseGeocodeEndpointTests(TestCase):
         self.assertEqual(response.json()['provider'], 'nominatim')
         mock_free.assert_called_once()
 
-    @patch('maps.views.google_reverse_geocode', return_value='12 Anna Salai, Chennai 600002')
+    @patch('maps.views.google_reverse_geocode',
+           return_value=Place('12 Anna Salai, Chennai 600002', 'Chennai'))
     def test_uses_google_once_configured(self, mock_google):
         settings_row = MapSettings.get_solo()
         settings_row.provider = MapSettings.Provider.GOOGLE
@@ -204,7 +207,8 @@ class ReverseGeocodeEndpointTests(TestCase):
         self.assertEqual(payload['address'], '12 Anna Salai, Chennai 600002')
         mock_google.assert_called_once()
 
-    @patch('maps.views._nominatim_reverse_geocode', return_value='12 Anna Salai, Chennai')
+    @patch('maps.views._nominatim_reverse_geocode',
+           return_value=Place('12 Anna Salai, Chennai', 'Chennai'))
     @patch('maps.views.google_reverse_geocode',
            side_effect=GoogleMapsError('Geocoding API has not been used'))
     def test_a_refused_google_key_still_returns_an_address(self, _mock_google, mock_free):

@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from accounts.models import User
 from .models import Customer
+from maps import plus_codes
 
 
 class CustomerRegisterSerializer(serializers.Serializer):
@@ -48,16 +49,22 @@ class CustomerProfileSerializer(serializers.ModelSerializer):
     phone_number = serializers.CharField(source='user.phone_number')
     email = serializers.EmailField(source='user.email', required=False, allow_blank=True)
     is_profile_complete = serializers.SerializerMethodField()
+    # Worked out from the pin rather than stored: a column for it could only
+    # ever drift out of step with the latitude and longitude beside it.
+    plus_code = serializers.SerializerMethodField()
 
     class Meta:
         model = Customer
         fields = [
             'id', 'username', 'first_name', 'last_name', 'phone_number', 'email',
             'address', 'state', 'district', 'pincode', 'latitude', 'longitude',
-            'is_profile_complete', 'email_verified',
+            'plus_code', 'is_profile_complete', 'email_verified',
         ]
         # Set by the email OTP flow alone; a profile save can never claim it.
         read_only_fields = ['email_verified']
+
+    def get_plus_code(self, obj):
+        return plus_codes.plus_code_for(obj.latitude, obj.longitude)
 
     def get_is_profile_complete(self, obj):
         return bool(
