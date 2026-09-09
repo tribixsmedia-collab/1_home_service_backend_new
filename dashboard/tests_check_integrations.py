@@ -4,11 +4,13 @@ and "configured but not working". These tests are about that distinction, and
 about the escalation that happens once DEBUG is off -- an OTP printing to a
 terminal is fine on a laptop and means nobody can sign in on a server.
 
-Everything runs with --offline: a test suite must not call Cloudinary,
-Firebase or Razorpay.
+Almost everything runs with --offline: a test suite must not call Cloudinary,
+Firebase or Razorpay. The two maps tests that need probing on mock Google and
+blank every other service first, so the suite still touches no network.
 """
 
 from io import StringIO
+from unittest import mock
 
 from django.core.management import call_command
 from django.test import TestCase, override_settings
@@ -16,15 +18,30 @@ from django.test import TestCase, override_settings
 from maps.models import MapSettings
 
 
-def run(**opts):
+def run(offline=True, **opts):
     """Returns (output, exit_code). The command exits non-zero on a problem."""
     out = StringIO()
     code = 0
     try:
-        call_command('check_integrations', offline=True, stdout=out, **opts)
+        call_command('check_integrations', offline=offline, stdout=out, **opts)
     except SystemExit as exc:
         code = exc.code
     return out.getvalue(), code
+
+
+# settings_test inherits the developer's real .env, so a check running with
+# offline=False would call Cloudinary and open an SMTP socket for real. Only
+# the maps tests need probing on; these leave every other service with nothing
+# to reach, so the suite still touches no network.
+NO_OTHER_NETWORK = override_settings(
+    USE_CLOUDINARY=False,
+    CLOUDINARY_CLOUD_NAME='', CLOUDINARY_API_KEY='', CLOUDINARY_API_SECRET='',
+    RAZORPAY_KEY_ID='', RAZORPAY_KEY_SECRET='',
+    RAZORPAYX_KEY_ID='', RAZORPAYX_KEY_SECRET='', RAZORPAYX_ACCOUNT_NUMBER='',
+    FCM_ENABLED=False,
+    SMS_BACKEND='console',
+    EMAIL_BACKEND='django.core.mail.backends.console.EmailBackend',
+)
 
 
 class StateClassificationTests(TestCase):
@@ -78,11 +95,58 @@ class MapsProviderTests(TestCase):
         self.assertEqual(code, 1)
 
     def test_google_selected_with_a_key_is_live(self):
+        """Offline, a saved key is as far as the check can go."""
         MapSettings.objects.create(
             provider=MapSettings.Provider.GOOGLE, google_api_key='AIza-test',
         )
         out, _ = run()
         self.assertRegex(out, r'Maps\s+LIVE')
+        self.assertIn('not checked', out)
+
+    @NO_OTHER_NETWORK
+    def test_a_key_google_refuses_is_broken_not_live(self):
+        """
+        A saved key is not an accepted key. Google refuses one whose project
+        has no billing, or with the APIs switched off, and refuses it at
+        request time -- nothing about the stored value shows it.
+
+        This shipped reporting LIVE on presence alone, while every map in the
+        customer app was quietly drawing the free basemap. Nothing looked
+        broken, which is the whole reason this command exists.
+        """
+        MapSettings.objects.create(
+            provider=MapSettings.Provider.GOOGLE, google_api_key='AIza-refused',
+        )
+        refusal = [
+            {'name': 'Map Tiles API', 'ok': False, 'detail': 'blocked'},
+            {'name': 'Geocoding API', 'ok': False, 'detail': 'not authorized'},
+        ]
+        with mock.patch('maps.google.check_key', return_value=refusal):
+            out, code = run(offline=False)
+
+        self.assertIn('BROKEN', out)
+        self.assertIn('not authorized', out)
+        self.assertEqual(code, 1)
+
+    @NO_OTHER_NETWORK
+    @override_settings(DEBUG=True)
+    def test_a_key_google_accepts_is_live(self):
+        # DEBUG=True so the other services, left unconfigured above, stay
+        # tolerated fallbacks. Otherwise the exit code would be 1 for reasons
+        # that have nothing to do with maps.
+        MapSettings.objects.create(
+            provider=MapSettings.Provider.GOOGLE, google_api_key='AIza-good',
+        )
+        accepted = [
+            {'name': 'Map Tiles API', 'ok': True, 'detail': 'fine'},
+            {'name': 'Geocoding API', 'ok': True, 'detail': 'fine'},
+        ]
+        with mock.patch('maps.google.check_key', return_value=accepted):
+            out, code = run(offline=False)
+
+        self.assertRegex(out, r'Maps\s+LIVE')
+        self.assertIn('key accepted', out)
+        self.assertEqual(code, 0)
 
     def test_free_map_is_a_fallback_that_is_not_a_problem(self):
         MapSettings.objects.create(provider=MapSettings.Provider.FREE)

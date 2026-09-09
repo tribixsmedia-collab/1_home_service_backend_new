@@ -273,14 +273,49 @@ def check_maps(offline):
     provider = getattr(row, 'provider', None) or MapSettings.Provider.FREE
 
     if provider == MapSettings.Provider.GOOGLE:
-        if not getattr(row, 'google_api_key', ''):
+        key = getattr(row, 'google_api_key', '')
+        if not key:
             return Result(
                 'Maps', BROKEN,
                 'the dashboard selects Google, but no API key is saved',
                 instead='maps and address lookup fail until a key is entered, '
                         'or the provider is set back to the free map',
             )
-        return Result('Maps', LIVE, 'Google maps and geocoding')
+
+        # A saved key is not an accepted key. Google refuses one whose project
+        # has no billing account, or which has the needed APIs switched off,
+        # and it refuses it at request time -- nothing about the stored value
+        # shows it. Reporting LIVE on presence alone is the false confidence
+        # this command exists to remove, and it did exactly that once.
+        if offline:
+            return Result('Maps', LIVE,
+                          'Google selected, key saved -- not checked (--offline)')
+
+        from maps import google
+        try:
+            checks = google.check_key(key)
+        except Exception as exc:
+            return Result('Maps', BROKEN,
+                          f'could not reach Google: {type(exc).__name__}: {exc}'[:150])
+
+        failed = [c for c in checks if not c['ok']]
+        if failed:
+            res = Result(
+                'Maps', BROKEN,
+                '; '.join(f"{c['name']}: {c['detail']}" for c in failed)[:200],
+                instead='the customer app keeps drawing the free basemap, and '
+                        'address lookup falls back with it -- nothing breaks '
+                        'visibly, which is why this needs asking about',
+            )
+            res.notes.append(
+                'Usually billing is not enabled on the Google Cloud project, '
+                'or Map Tiles / Geocoding are not switched on for this key.'
+            )
+            return res
+
+        return Result('Maps', LIVE,
+                      'Google, key accepted for ' +
+                      ' and '.join(c['name'] for c in checks))
 
     return Result(
         'Maps', FALLBACK, f'provider "{provider}"',
