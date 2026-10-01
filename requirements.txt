@@ -10,16 +10,13 @@ djangorestframework==3.16.1
 djangorestframework_simplejwt==5.5.1
 google-auth==2.56.2
 gunicorn==25.1.0
-mysqlclient==2.2.8
 packaging==26.0
 pillow==12.1.1
 psycopg2-binary==2.9.11
 PyJWT==2.12.1
-PyMySQL==1.1.2
 python-decouple==3.8
 razorpay==2.0.1
 requests==2.34.2
-rest-framework-simplejwt==0.0.2
 six==1.17.0
 sqlparse==0.5.5
 tzdata==2025.3
