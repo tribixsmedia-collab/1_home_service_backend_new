@@ -1,4 +1,4 @@
-import random
+import secrets
 from datetime import timedelta
 from django.utils import timezone
 from django.conf import settings
@@ -28,7 +28,10 @@ class SendOTPSerializer(serializers.Serializer):
             wait_left = cooldown - int((timezone.now() - recent.created_at).total_seconds())
             raise serializers.ValidationError(f"Please wait {wait_left} seconds before requesting another OTP.")
 
-        code = f"{random.randint(100000, 999999)}"
+        # secrets, not the random module: that is the Mersenne Twister,
+        # whose next output is derivable from a handful of observed
+        # ones. These six digits are the whole of the login.
+        code = f"{secrets.randbelow(900000) + 100000}"
         expiry_minutes = getattr(settings, 'OTP_EXPIRY_MINUTES', 5)
         otp = OTPRequest.objects.create(
             phone_number=phone_number,
