@@ -207,6 +207,21 @@ OTP_RESEND_COOLDOWN_SECONDS = config('OTP_RESEND_COOLDOWN_SECONDS', default=60, 
 
 FAST2SMS_API_KEY = config('FAST2SMS_API_KEY', default='')
 MSG91_AUTH_KEY = config('MSG91_AUTH_KEY', default='')
+
+# India's DLT rules mean the OTP wording is not ours to choose: it lives in a
+# template approved on the DLT portal, and MSG91 is told which one by id. The
+# sender header (RNIREL and friends) is bound to that template too, which is
+# why MSG91_SENDER_ID is not sent with the request.
+MSG91_TEMPLATE_ID = config('MSG91_TEMPLATE_ID', default='')
+
+# The name of the blank the template leaves for the code. Whatever was typed
+# when the template was created -- MSG91's own examples use VAR1, but a
+# template written with a named variable wants that name instead. Wrong name,
+# and MSG91 answers 200 with an error body and nothing is delivered.
+MSG91_OTP_VARIABLE = config('MSG91_OTP_VARIABLE', default='VAR1')
+
+# Kept because the dashboard and older backends reference it; the Flow API
+# takes the sender from the template.
 MSG91_SENDER_ID = config('MSG91_SENDER_ID', default='')
 TWILIO_ACCOUNT_SID = config('TWILIO_ACCOUNT_SID', default='')
 TWILIO_AUTH_TOKEN = config('TWILIO_AUTH_TOKEN', default='')
