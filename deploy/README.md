@@ -194,7 +194,72 @@ login codes printing to a terminal, payments refusing — as problems, and exits
 non-zero. That makes it the natural last line of `deploy.sh` once the client's
 keys are in. Add `--offline` to skip the network calls.
 
-## 10. Point the apps at the server
+## 10. Host the customer web app
+
+The customer app also runs as a website. It is a pile of static files, so it
+can live either on this same EC2 box or on ordinary shared hosting — it does
+not need Python, and it must NOT share a hostname with the API, because Django
+already owns `/` there for the admin dashboard.
+
+Build it first, on your own machine:
+
+```bash
+cd "home service project/customer_app" && ./build_web.sh
+```
+
+**The API address is compiled in.** There is no runtime setting to change
+afterwards, so a build points at whichever host it was built against for ever.
+`build_web.sh` refuses a plain-http address, because a page served over https
+cannot call one — browsers block it as mixed content and the app loads, then
+quietly does nothing.
+
+### Option A — on this server, with nginx
+
+```bash
+scp -i C:/keys/homeservice-key.pem homeservice-web.tar.gz ubuntu@13.200.180.192:/tmp/
+```
+
+Then on the server:
+
+```bash
+sudo mkdir -p /srv/homeservice-web
+sudo tar -xzf /tmp/homeservice-web.tar.gz -C /srv/homeservice-web
+sudo chown -R www-data:www-data /srv/homeservice-web
+sudo cp /srv/homeservice/deploy/nginx-web.conf /etc/nginx/sites-available/homeservice-web
+sudo ln -sf /etc/nginx/sites-available/homeservice-web /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d web.13-200-180-192.sslip.io
+```
+
+Costs nothing extra — same box, same bill.
+
+### Option B — on Hostinger or similar shared hosting
+
+Upload the **contents** of `build/web/` to `public_html`, including the hidden
+`.htaccess`. Turn on the free SSL certificate in the hosting panel.
+
+The `.htaccess` does what the nginx config does: serves `index.html` for routes
+the app handles itself, and stops `index.html` being cached. Without it the
+site loads but every refresh and every shared link 404s.
+
+Only the **frontend** can go here. The Django backend needs Python, PostgreSQL
+and a long-running process, so it stays on AWS.
+
+### Either way: allow the origin on the backend
+
+The page and the API are on different hostnames, so the browser will refuse the
+calls unless the backend names the origin. In `/srv/homeservice/.env`:
+
+```
+CORS_ALLOWED_ORIGINS=https://web.13-200-180-192.sslip.io
+```
+
+— or the Hostinger address. Then `sudo systemctl restart homeservice`.
+
+Miss this and the site loads, shows its shell, and no data ever appears. The
+reason is visible only in the browser's own console, not in any server log.
+
+## 11. Point the apps at the server
 
 In both Flutter apps, `lib/config.dart` holds the backend address. Change it
 to `https://api.yourdomain.com` and rebuild. Until this is done the apps still
