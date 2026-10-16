@@ -22,3 +22,6 @@ __pycache__/
 media/
 secrets/
 secrets/fcm-service-account.json
+
+# Word lock files, created while a .docx in deploy/ is open.
+~$*

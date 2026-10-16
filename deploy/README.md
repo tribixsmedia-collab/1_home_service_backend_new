@@ -302,6 +302,12 @@ clears in about 24 hours, but it is a queue, not a button.
 
 ## Deploying an update
 
+**Full step-by-step guide, covering both the backend and the customer web app:
+[UPDATING.md](UPDATING.md).** Read that one if you are shipping a change.
+
+The short version:
+
+
 Once, on your own machine, push to `main`. Then on the server:
 
 ```bash
