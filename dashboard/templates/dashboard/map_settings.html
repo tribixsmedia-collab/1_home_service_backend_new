@@ -123,15 +123,35 @@
                 </p>
             </div>
 
-            <div class="rounded-lg bg-amber-50 text-amber-900 text-sm px-4 py-3">
+            <div class="rounded-lg bg-amber-50 text-amber-900 text-sm px-4 py-3 space-y-2">
                 <p class="font-semibold">Restrict this key in Google Cloud</p>
-                <p class="mt-1 text-amber-800">
+                <p class="text-amber-800">
                     A map key is read by the browser and by the phone, so it can
                     always be seen &mdash; that is true of every map on the web, not
                     only this one. What stops somebody else spending it is the
-                    restriction: set an HTTP referrer restriction for this
-                    dashboard&rsquo;s domain and an API restriction to the three APIs
-                    above, and set a budget alert while you are in there.
+                    restriction, and for this key that means two settings in
+                    particular.
+                </p>
+                <ul class="list-disc list-inside space-y-1 text-amber-800">
+                    <li>
+                        <span class="font-semibold">Application restrictions: None.</span>
+                        Not a mistake. The key is called from four places: this
+                        dashboard, the customer web app on its own domain, the phone
+                        apps, which send no referrer at all, and this server. Google
+                        allows only one kind of application restriction per key, so
+                        an HTTP referrer rule would break three of those four.
+                    </li>
+                    <li>
+                        <span class="font-semibold">API restrictions: the three APIs
+                        above</span>, and nothing else. This is what stops a copied
+                        key being spent on other Google products.
+                    </li>
+                </ul>
+                <p class="text-amber-800">
+                    Then set a daily quota cap under Google Maps Platform &rarr;
+                    Quotas and a budget alert under Billing. The cap is the real
+                    ceiling: tiles default to 15,000 requests a day, which runs out
+                    long before the monthly free allowance does.
                 </p>
             </div>
         </div>
