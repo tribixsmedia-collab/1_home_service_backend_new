@@ -99,12 +99,43 @@ DNS takes a few minutes. Check with `ping api.yourdomain.com` before going on
 
 ## 5. Set the server up
 
-SSH in and run the setup script:
+The repository is private, so the box needs its own read-only deploy key
+before it can clone anything. SSH in and create one first:
 
 ```bash
 ssh -i your-key.pem ubuntu@api.yourdomain.com
+```
 
-git clone https://github.com/tribixsmedia-collab/1_home_service_backend_new.git /tmp/hs
+```bash
+sudo install -d -o root -g www-data -m 750 /etc/homeservice
+sudo ssh-keygen -t ed25519 -N '' -C 'homeservice-ec2-deploy' -f /etc/homeservice/deploy_key
+sudo chown www-data:www-data /etc/homeservice/deploy_key
+sudo chmod 400 /etc/homeservice/deploy_key
+sudo cat /etc/homeservice/deploy_key.pub
+```
+
+Paste that public key into the repository on GitHub under Settings ->
+Deploy keys -> Add deploy key, and leave **Allow write access** unchecked.
+A server that can pull but cannot push is the whole point: if the box is
+ever compromised, the key on it cannot rewrite the repository.
+
+The key is deliberately passphrase-less, because deploys run unattended.
+It is scoped to this one repository rather than to an account, so it grants
+nothing else even if it leaks.
+
+Then, still on the server, fetch the setup script and run it. Both commands
+go through sudo: root is the only user that can read the deploy key, and
+GitHub is not in the host-key file yet on a box this new.
+
+```bash
+sudo sh -c 'ssh-keyscan -t ed25519 github.com >> /etc/ssh/ssh_known_hosts'
+```
+
+```bash
+sudo GIT_SSH_COMMAND='ssh -i /etc/homeservice/deploy_key -o IdentitiesOnly=yes' git clone git@github.com:tribixsmedia-collab/1_home_service_backend_new.git /tmp/hs
+```
+
+```bash
 sudo bash /tmp/hs/deploy/setup_server.sh
 ```
 
