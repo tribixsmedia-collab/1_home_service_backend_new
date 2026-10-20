@@ -196,6 +196,17 @@ urlpatterns = [
     path('login-security/unlock/', views.login_security_unlock_view, name='login_security_unlock'),
     path('support/', views.support_tickets_view, name='support_tickets'),
     path('support/<int:ticket_id>/', views.support_ticket_detail_view, name='support_ticket_detail'),
+
+    # AI assistant: what it was asked, and what it is allowed to answer
+    path('assistant/', views.assistant_conversations_view, name='assistant_conversations'),
+    path('assistant/settings/', views.assistant_settings_view, name='assistant_settings'),
+    path('assistant/ask/', views.assistant_admin_chat_view, name='assistant_admin_chat'),
+    path('assistant/answers/', views.assistant_knowledge_list_view, name='assistant_knowledge_list'),
+    path('assistant/answers/add/', views.assistant_knowledge_add_view, name='assistant_knowledge_add'),
+    path('assistant/answers/<int:entry_id>/edit/', views.assistant_knowledge_edit_view, name='assistant_knowledge_edit'),
+    path('assistant/answers/<int:entry_id>/delete/', views.assistant_knowledge_delete_view, name='assistant_knowledge_delete'),
+    path('assistant/answers/<int:entry_id>/toggle/', views.assistant_knowledge_toggle_view, name='assistant_knowledge_toggle'),
+    path('assistant/<int:conversation_id>/', views.assistant_conversation_detail_view, name='assistant_conversation_detail'),
     path('assignment-center/', views.assignment_center_view, name='assignment_center'),
     path('bookings/<int:booking_id>/auto-assign/', views.auto_assign_view, name='auto_assign'),
     path('bulk-auto-assign/', views.bulk_auto_assign_view, name='bulk_auto_assign'),

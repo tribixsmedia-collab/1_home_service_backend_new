@@ -91,6 +91,7 @@ INSTALLED_APPS = [
     'tenders',
     'subscriptions',
     'maps',
+    'assistant',
 ]
 
 MIDDLEWARE = [

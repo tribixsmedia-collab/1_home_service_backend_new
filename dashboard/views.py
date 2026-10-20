@@ -5202,3 +5202,398 @@ def map_settings_view(request):
         'key_checks': key_checks,
         'free_attribution': MapSettings.FREE_ATTRIBUTION,
     })
+
+
+# ================= AI ASSISTANT =================
+#
+# Three pages, and the split between them is the point:
+#
+#   Chats       -- what people actually asked. The column that matters is
+#                  "couldn't answer", because that is the list of answers the
+#                  answer book is missing.
+#   Answer book -- the only text the assistant may produce that is not read
+#                  live from a row. An admin writes every word of it.
+#   Settings    -- which engine, who it is on for, and the daily cap.
+
+from assistant import engine, escalation
+from assistant.intents import starters_for as assistant_starters_for
+from assistant.models import (
+    AssistantSettings, Conversation, KnowledgeEntry, Message,
+    questions_asked_today,
+)
+
+
+@admin_login_required
+def assistant_conversations_view(request):
+    """
+    Every chat with the assistant, newest activity first.
+
+    `who` splits it by audience, `state` narrows to the two kinds that need
+    attention: chats the assistant failed on, and chats it handed over.
+    """
+    who_filter = request.GET.get('who', '')
+    state_filter = request.GET.get('state', '')
+    query = request.GET.get('q', '').strip()
+
+    conversations = Conversation.objects.select_related(
+        'customer__user', 'vendor__user', 'admin_user', 'escalated_ticket',
+    ).annotate(
+        turns=models.Count('messages', distinct=True),
+        unanswered=models.Count(
+            'messages',
+            filter=models.Q(messages__intent=Message.FALLBACK_INTENT),
+            distinct=True,
+        ),
+    )
+
+    if who_filter in Conversation.Audience.values:
+        conversations = conversations.filter(audience=who_filter)
+
+    if state_filter == 'unanswered':
+        conversations = conversations.filter(unanswered__gt=0)
+    elif state_filter == 'escalated':
+        conversations = conversations.filter(escalated_at__isnull=False)
+
+    if query:
+        # The transcript is searched as well as the person: "did anyone ask
+        # about refunds" is the question this page gets put to.
+        conversations = conversations.filter(
+            models.Q(customer__user__username__icontains=query)
+            | models.Q(customer__user__first_name__icontains=query)
+            | models.Q(customer__user__last_name__icontains=query)
+            | models.Q(vendor__user__username__icontains=query)
+            | models.Q(vendor__user__first_name__icontains=query)
+            | models.Q(vendor__user__last_name__icontains=query)
+            | models.Q(messages__text__icontains=query)
+        ).distinct()
+
+    conversations = conversations.order_by('-updated_at')
+
+    paginator = Paginator(conversations, 20)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
+    all_chats = Conversation.objects.all()
+
+    context = {
+        'admin_user': request.admin_user,
+        'active_page': 'assistant',
+        'page_obj': page_obj,
+        'current_who': who_filter,
+        'current_state': state_filter,
+        'query': query,
+        'audience_tabs': [('', 'All')] + list(Conversation.Audience.choices),
+        'total_count': all_chats.count(),
+        'escalated_count': all_chats.filter(escalated_at__isnull=False).count(),
+        'unanswered_count': all_chats.filter(
+            messages__intent=Message.FALLBACK_INTENT,
+        ).distinct().count(),
+        'settings_row': AssistantSettings.get_solo(),
+    }
+    return render(request, 'dashboard/assistant_conversations.html', context)
+
+
+@admin_login_required
+def assistant_conversation_detail_view(request, conversation_id):
+    """
+    One transcript, with the audit trail beside every answer.
+
+    The audit is why this page exists rather than a plain chat-bubble view:
+    which rule fired and what it read is what any complaint about the
+    assistant comes down to.
+    """
+    conversation = get_object_or_404(
+        Conversation.objects.select_related(
+            'customer__user', 'vendor__user', 'admin_user', 'escalated_ticket',
+        ).prefetch_related('messages'),
+        id=conversation_id,
+    )
+
+    # The answer-book entries this chat quoted, so an admin reading a bad
+    # answer can go straight to the wording that produced it.
+    quoted_ids = {
+        int(message.intent.split(':', 1)[1])
+        for message in conversation.messages.all()
+        if message.intent.startswith('knowledge:')
+        and message.intent.split(':', 1)[1].isdigit()
+    }
+
+    context = {
+        'admin_user': request.admin_user,
+        'active_page': 'assistant',
+        'conversation': conversation,
+        'quoted_entries': KnowledgeEntry.objects.filter(id__in=quoted_ids),
+    }
+    return render(request, 'dashboard/assistant_conversation_detail.html', context)
+
+
+# ---------- The answer book ----------
+
+@admin_login_required
+def assistant_knowledge_list_view(request):
+    audience_filter = request.GET.get('audience', '')
+    query = request.GET.get('q', '').strip()
+
+    entries = KnowledgeEntry.objects.all()
+
+    if audience_filter in KnowledgeEntry.Audience.values:
+        entries = entries.filter(audience=audience_filter)
+
+    if query:
+        entries = entries.filter(
+            models.Q(question__icontains=query)
+            | models.Q(keywords__icontains=query)
+            | models.Q(answer__icontains=query)
+        )
+
+    context = {
+        'admin_user': request.admin_user,
+        'active_page': 'assistant',
+        'entries': entries,
+        'current_audience': audience_filter,
+        'query': query,
+        'audience_tabs': [('', 'All')] + list(KnowledgeEntry.Audience.choices),
+        'draft_count': KnowledgeEntry.objects.filter(is_active=False).count(),
+    }
+    return render(request, 'dashboard/assistant_knowledge_list.html', context)
+
+
+def _save_knowledge_entry(request, entry):
+    """
+    Read one answer-book entry off the posted form.
+
+    Every field is read every time, because this form posts the whole entry:
+    a field missing from the POST means the admin cleared it, so it is saved
+    cleared rather than left at its old value.
+    """
+    question = (request.POST.get('question') or '').strip()
+    answer = (request.POST.get('answer') or '').strip()
+
+    if not question or not answer:
+        messages.error(request, 'A question and an answer are both required.')
+        return False
+
+    audience = request.POST.get('audience', KnowledgeEntry.Audience.ALL)
+    if audience not in KnowledgeEntry.Audience.values:
+        audience = KnowledgeEntry.Audience.ALL
+
+    try:
+        sort_order = int(request.POST.get('sort_order') or 0)
+    except (TypeError, ValueError):
+        sort_order = 0
+
+    entry.question = question[:200]
+    entry.answer = answer
+    entry.keywords = (request.POST.get('keywords') or '').strip()[:300]
+    entry.audience = audience
+    entry.sort_order = max(sort_order, 0)
+    entry.is_active = request.POST.get('is_active') == 'on'
+    entry.save()
+    return True
+
+
+@admin_login_required
+def assistant_knowledge_add_view(request):
+    if request.method == 'POST':
+        entry = KnowledgeEntry()
+        if _save_knowledge_entry(request, entry):
+            messages.success(request, 'Answer added.')
+            return redirect('assistant_knowledge_list')
+
+    return render(request, 'dashboard/assistant_knowledge_form.html', {
+        'admin_user': request.admin_user,
+        'active_page': 'assistant',
+        'entry': None,
+        'audiences': KnowledgeEntry.Audience.choices,
+    })
+
+
+@admin_login_required
+def assistant_knowledge_edit_view(request, entry_id):
+    entry = get_object_or_404(KnowledgeEntry, id=entry_id)
+
+    if request.method == 'POST':
+        if _save_knowledge_entry(request, entry):
+            messages.success(request, 'Answer updated.')
+            return redirect('assistant_knowledge_list')
+
+    return render(request, 'dashboard/assistant_knowledge_form.html', {
+        'admin_user': request.admin_user,
+        'active_page': 'assistant',
+        'entry': entry,
+        'audiences': KnowledgeEntry.Audience.choices,
+    })
+
+
+@admin_login_required
+def assistant_knowledge_delete_view(request, entry_id):
+    entry = get_object_or_404(KnowledgeEntry, id=entry_id)
+    if request.method == 'POST':
+        entry.delete()
+        messages.success(request, 'Answer deleted.')
+    return redirect('assistant_knowledge_list')
+
+
+@admin_login_required
+def assistant_knowledge_toggle_view(request, entry_id):
+    """
+    Switch one answer on or off.
+
+    Off is a real state rather than a soft delete: the seeded policy drafts
+    ship switched off precisely so the assistant refuses those questions
+    until somebody writes the business's own wording.
+    """
+    entry = get_object_or_404(KnowledgeEntry, id=entry_id)
+    entry.is_active = not entry.is_active
+    entry.save(update_fields=['is_active', 'updated_at'])
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': True, 'is_active': entry.is_active})
+
+    messages.success(
+        request,
+        'Answer switched on.' if entry.is_active else 'Answer switched off.',
+    )
+    return redirect('assistant_knowledge_list')
+
+
+# ---------- Settings ----------
+
+@admin_login_required
+def assistant_settings_view(request):
+    """
+    Which engine answers, who it answers, and what it may cost.
+
+    The engine switch is the one that matters. The rules engine is free and
+    answers from the answer book plus live data; Claude is billed per question
+    and is not written yet, so choosing it keeps the rules engine answering
+    and says so rather than going quiet.
+    """
+    settings_row = AssistantSettings.get_solo()
+
+    if request.method == 'POST':
+        engine = request.POST.get('engine', AssistantSettings.Engine.RULES)
+        if engine not in AssistantSettings.Engine.values:
+            engine = AssistantSettings.Engine.RULES
+
+        def whole_number(field, default):
+            try:
+                return max(int(request.POST.get(field) or default), 0)
+            except (TypeError, ValueError):
+                return default
+
+        settings_row.engine = engine
+        settings_row.customer_enabled = request.POST.get('customer_enabled') == 'on'
+        settings_row.vendor_enabled = request.POST.get('vendor_enabled') == 'on'
+        settings_row.admin_enabled = request.POST.get('admin_enabled') == 'on'
+        settings_row.daily_message_limit = whole_number('daily_message_limit', 50)
+        settings_row.monthly_token_cap = whole_number('monthly_token_cap', 0)
+        settings_row.claude_api_key = (
+            request.POST.get('claude_api_key') or ''
+        ).strip()
+        settings_row.claude_model = (
+            request.POST.get('claude_model') or 'claude-haiku-5-5'
+        ).strip()
+        settings_row.greeting = (request.POST.get('greeting') or '').strip()
+        settings_row.fallback_message = (
+            request.POST.get('fallback_message') or ''
+        ).strip()
+        settings_row.save()
+
+        if settings_row.is_awaiting_key:
+            messages.warning(
+                request,
+                'Saved, but Claude needs an API key. The rules engine keeps '
+                'answering until one is added.'
+            )
+        elif engine == AssistantSettings.Engine.CLAUDE:
+            messages.warning(
+                request,
+                'Saved. The Claude engine is not built yet, so the rules '
+                'engine is still answering every question.'
+            )
+        else:
+            messages.success(request, 'Saved.')
+
+        return redirect('assistant_settings')
+
+    return render(request, 'dashboard/assistant_settings.html', {
+        'admin_user': request.admin_user,
+        'active_page': 'assistant',
+        'settings_row': settings_row,
+        'engines': AssistantSettings.Engine.choices,
+        'draft_count': KnowledgeEntry.objects.filter(is_active=False).count(),
+        'active_answers': KnowledgeEntry.objects.filter(is_active=True).count(),
+        # Claude is designed for but unwritten. The page says so rather than
+        # implying that choosing it changes anything today.
+        'claude_is_built': False,
+    })
+
+
+@admin_login_required
+def assistant_admin_chat_view(request):
+    """
+    Ask the assistant for a figure, from inside the dashboard.
+
+    A plain form post rather than a fetch, because there is nothing here that
+    needs to be live: one question, one answer, redirect so a refresh does not
+    re-ask it.
+
+    `request.admin_perms` is handed to the engine, and that is what makes this
+    safe to put in front of every dashboard user. Each report is gated on the
+    permission its equivalent page needs, so somebody who cannot open Reports
+    is told they lack `reports.view` rather than being read the revenue.
+    """
+    settings_row = AssistantSettings.get_solo()
+    conversation = escalation.conversation_for(request.admin_user)
+
+    if request.method == 'POST':
+        if not settings_row.admin_enabled:
+            messages.error(
+                request, 'The assistant is switched off for this dashboard.',
+            )
+            return redirect('assistant_admin_chat')
+
+        question = (request.POST.get('question') or '').strip()
+        if not question:
+            messages.error(request, 'Type a question first.')
+            return redirect('assistant_admin_chat')
+
+        limit = settings_row.daily_message_limit
+        if limit and questions_asked_today(request.admin_user) >= limit:
+            messages.error(
+                request,
+                "You have reached today's limit for assistant questions.",
+            )
+            return redirect('assistant_admin_chat')
+
+        Message.objects.create(
+            conversation=conversation,
+            role=Message.Role.USER,
+            text=question[:1000],
+        )
+        answer = engine.ask(
+            question[:1000],
+            audience=Conversation.Audience.ADMIN,
+            user=request.admin_user,
+            settings_row=settings_row,
+            permissions=request.admin_perms,
+        )
+        Message.objects.create(
+            conversation=conversation,
+            role=Message.Role.BOT,
+            text=answer.text,
+            intent=answer.intent,
+            engine=answer.engine,
+            tool_calls=answer.tool_calls,
+            tokens_used=answer.tokens_used,
+        )
+        conversation.touch()
+        return redirect('assistant_admin_chat')
+
+    return render(request, 'dashboard/assistant_admin_chat.html', {
+        'admin_user': request.admin_user,
+        'active_page': 'assistant',
+        'settings_row': settings_row,
+        'conversation': conversation,
+        'starters': assistant_starters_for(Conversation.Audience.ADMIN),
+    })

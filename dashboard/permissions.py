@@ -99,6 +99,13 @@ PERMISSION_GROUPS = [
         ('support.manage', 'Answer support tickets',
          'Reply to a ticket and change its status.'),
     ]),
+    ('AI assistant', [
+        ('assistant.view', 'View assistant chats',
+         'Read what customers and vendors asked the assistant, and what it '
+         'answered.'),
+        ('assistant.manage', 'Manage the assistant',
+         'Write the answer book, and switch the assistant on or off per app.'),
+    ]),
     ('Reports', [
         ('reports.view', 'View reports',
          'Open the reports page and its revenue figures.'),
@@ -288,6 +295,17 @@ URL_PERMISSIONS = {
     # Help & support
     'support_tickets': 'support.view',
     'support_ticket_detail': {'GET': 'support.view', 'POST': 'support.manage'},
+
+    # AI assistant
+    'assistant_conversations': 'assistant.view',
+    'assistant_admin_chat': 'assistant.view',
+    'assistant_conversation_detail': 'assistant.view',
+    'assistant_knowledge_list': 'assistant.view',
+    'assistant_settings': {'GET': 'assistant.view', 'POST': 'assistant.manage'},
+    'assistant_knowledge_add': 'assistant.manage',
+    'assistant_knowledge_edit': 'assistant.manage',
+    'assistant_knowledge_delete': 'assistant.manage',
+    'assistant_knowledge_toggle': 'assistant.manage',
 
     # Reports
     'reports': 'reports.view',

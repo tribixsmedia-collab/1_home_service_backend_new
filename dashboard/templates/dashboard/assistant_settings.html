@@ -1,0 +1,199 @@
+{% extends "dashboard/_layout.html" %}
+
+{% block title %}Assistant settings{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="mb-4 px-4 py-3 rounded-lg text-sm
+                {% if message.tags == 'error' %}bg-red-50 text-red-700
+                {% elif message.tags == 'warning' %}bg-amber-50 text-amber-800
+                {% else %}bg-green-50 text-green-700{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <a href="{% url 'assistant_conversations' %}" class="text-sm text-gray-500 hover:text-gray-700">&larr; Back to assistant chats</a>
+
+    <div class="mt-3 mb-6">
+        <h1 class="text-2xl lg:text-3xl font-bold text-gray-900">Assistant settings</h1>
+        <p class="text-gray-500 mt-1">Which engine answers, who can reach it, and what it may cost.</p>
+    </div>
+
+    <div class="mb-5 rounded-2xl border border-gray-200 bg-white p-5">
+        <div class="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+                <div class="text-xs uppercase tracking-wide text-gray-500 font-semibold">Answering right now</div>
+                <div class="mt-1 text-lg font-bold text-gray-900">Rules engine</div>
+                <div class="text-sm text-gray-500">
+                    {{ active_answers }} answer{{ active_answers|pluralize }} switched on{% if draft_count %}, {{ draft_count }} off{% endif %}.
+                    No per-question cost.
+                </div>
+            </div>
+            <a href="{% url 'assistant_knowledge_list' %}"
+               class="bg-white border border-gray-300 text-gray-700 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-gray-50">Answer book</a>
+        </div>
+    </div>
+
+    <form method="post" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
+        {% csrf_token %}
+
+        <!-- Engine -->
+        <div>
+            <h2 class="font-semibold text-gray-900 mb-1">Engine</h2>
+            <p class="text-sm text-gray-500 mb-3">
+                The rules engine answers from the answer book plus the person's own live data.
+                It costs nothing and needs no key.
+            </p>
+            <div class="space-y-2">
+                {% for value, label in engines %}
+                <label class="flex items-start gap-3 rounded-xl border p-4 cursor-pointer {% if settings_row.engine == value %}border-primary-500 bg-primary-50{% else %}border-gray-200{% endif %}">
+                    <input type="radio" name="engine" value="{{ value }}" class="mt-0.5"
+                           {% if settings_row.engine == value %}checked{% endif %}>
+                    <span>
+                        <span class="block text-sm font-semibold text-gray-900">{{ label }}</span>
+                        {% if value == 'RULES' %}
+                        <span class="block text-xs text-gray-500">Free. Cannot invent an answer, because it cannot write one.</span>
+                        {% else %}
+                        <span class="block text-xs text-gray-500">
+                            Billed per question against an Anthropic API key.
+                            {% if not claude_is_built %}<span class="font-semibold text-orange-700">Not built yet, so the rules engine keeps answering.</span>{% endif %}
+                        </span>
+                        {% endif %}
+                    </span>
+                </label>
+                {% endfor %}
+            </div>
+
+            {% if settings_row.is_awaiting_key %}
+            <div class="mt-3 rounded-xl border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800">
+                Claude is selected but there is no API key, so the rules engine is answering.
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Who can reach it -->
+        <div class="border-t border-gray-100 pt-6">
+            <h2 class="font-semibold text-gray-900 mb-1">Where it appears</h2>
+            <p class="text-sm text-gray-500 mb-3">
+                Each app checks its own switch, so you can trial the assistant with vendors
+                before customers ever see it.
+            </p>
+            <div class="space-y-2">
+                <label class="flex items-center gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer">
+                    <input type="checkbox" name="customer_enabled" class="w-4 h-4 rounded border-gray-300"
+                           {% if settings_row.customer_enabled %}checked{% endif %}>
+                    <span class="text-sm font-semibold text-gray-900">Customer app</span>
+                </label>
+                <label class="flex items-center gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer">
+                    <input type="checkbox" name="vendor_enabled" class="w-4 h-4 rounded border-gray-300"
+                           {% if settings_row.vendor_enabled %}checked{% endif %}>
+                    <span>
+                        <span class="block text-sm font-semibold text-gray-900">Vendor app</span>
+                        <span class="block text-xs text-gray-500">
+                            Vendors can ask about their jobs, payouts, bids and why work is
+                            not reaching them.
+                        </span>
+                    </span>
+                </label>
+                <label class="flex items-center gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer">
+                    <input type="checkbox" name="admin_enabled" class="w-4 h-4 rounded border-gray-300"
+                           {% if settings_row.admin_enabled %}checked{% endif %}>
+                    <span>
+                        <span class="block text-sm font-semibold text-gray-900">This dashboard</span>
+                        <span class="block text-xs text-gray-500">
+                            Adds "Ask the assistant" for figures on bookings, revenue,
+                            vendors and what is pending. Each figure still needs the
+                            permission its own page needs.
+                        </span>
+                    </span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Caps -->
+        <div class="border-t border-gray-100 pt-6">
+            <h2 class="font-semibold text-gray-900 mb-1">Limits</h2>
+            <p class="text-sm text-gray-500 mb-3">
+                The rules engine is free, so these mainly matter once Claude is on. They are
+                enforced either way, because an app stuck in a loop is a problem regardless.
+            </p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Questions per person per day</label>
+                    <input type="number" name="daily_message_limit" min="0"
+                           value="{{ settings_row.daily_message_limit }}"
+                           class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+                    <p class="text-xs text-gray-500 mt-1">0 removes the limit.</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Monthly token cap</label>
+                    <input type="number" name="monthly_token_cap" min="0"
+                           value="{{ settings_row.monthly_token_cap }}"
+                           class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+                    <p class="text-xs text-gray-500 mt-1">0 removes the cap. Only spent by Claude.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Claude -->
+        <div class="border-t border-gray-100 pt-6">
+            <h2 class="font-semibold text-gray-900 mb-1">Claude API</h2>
+            <p class="text-sm text-gray-500 mb-3">
+                Only used when the engine above is set to Claude. Leave empty to stay on the
+                free engine.
+            </p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">API key</label>
+                    <input type="text" name="claude_api_key" autocomplete="off"
+                           value="{{ settings_row.claude_api_key }}"
+                           placeholder="sk-ant-..."
+                           class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Model</label>
+                    <input type="text" name="claude_model"
+                           value="{{ settings_row.claude_model }}"
+                           class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+                </div>
+            </div>
+        </div>
+
+        <!-- Wording -->
+        <div class="border-t border-gray-100 pt-6">
+            <h2 class="font-semibold text-gray-900 mb-1">Wording</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Opening line</label>
+                    <textarea name="greeting" rows="2"
+                              class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">{{ settings_row.greeting }}</textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">When it does not know</label>
+                    <textarea name="fallback_message" rows="2"
+                              class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">{{ settings_row.fallback_message }}</textarea>
+                    <p class="text-xs text-gray-500 mt-1">
+                        Shown with the closest questions it could find, and an offer to pass the
+                        chat to Help &amp; Support.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        {% if 'assistant.manage' in admin_perms %}
+        <div class="flex gap-3 border-t border-gray-100 pt-6">
+            <button type="submit" class="bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg">Save settings</button>
+            <a href="{% url 'assistant_conversations' %}"
+               class="px-5 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</a>
+        </div>
+        {% else %}
+        <div class="border-t border-gray-100 pt-6 text-sm text-gray-500">
+            You can read these settings but not change them.
+        </div>
+        {% endif %}
+    </form>
+</div>
+{% endblock %}

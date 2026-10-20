@@ -1,0 +1,100 @@
+{% extends "dashboard/_layout.html" %}
+
+{% block title %}Chat #{{ conversation.id }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="mb-4 px-4 py-3 rounded-lg text-sm
+                {% if message.tags == 'error' %}bg-red-50 text-red-700
+                {% elif message.tags == 'warning' %}bg-amber-50 text-amber-800
+                {% else %}bg-green-50 text-green-700{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <a href="{% url 'assistant_conversations' %}" class="text-sm text-gray-500 hover:text-gray-700">&larr; Back to assistant chats</a>
+
+    <div class="mt-3 mb-6 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
+        <div>
+            <h1 class="text-2xl lg:text-3xl font-bold text-gray-900">{{ conversation.party_name }}</h1>
+            <p class="text-gray-500 mt-1">
+                {{ conversation.get_audience_display }}
+                {% if conversation.party_phone %}· {{ conversation.party_phone }}{% endif %}
+                · started {{ conversation.started_at|date:"M d, Y H:i" }}
+            </p>
+        </div>
+        {% if conversation.escalated_ticket %}
+        <a href="{% url 'support_ticket_detail' conversation.escalated_ticket.id %}"
+           class="bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+            Handed over &rarr; ticket #{{ conversation.escalated_ticket.id }}
+        </a>
+        {% endif %}
+    </div>
+
+    {% if conversation.unanswered_count %}
+    <div class="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        The assistant could not answer {{ conversation.unanswered_count }}
+        question{{ conversation.unanswered_count|pluralize }} in this chat. They are marked below.
+        {% if 'assistant.manage' in admin_perms %}
+        <a href="{% url 'assistant_knowledge_add' %}" class="font-semibold underline">Add the answer</a>
+        so the next person gets it.
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Transcript -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+        {% for message in conversation.messages.all %}
+        <div class="flex {% if message.is_bot %}justify-start{% else %}justify-end{% endif %}">
+            <div class="max-w-[85%]">
+                <div class="rounded-2xl px-4 py-3 text-sm whitespace-pre-line
+                    {% if message.is_bot %}
+                        {% if message.is_unanswered %}bg-red-50 border border-red-200 text-red-900{% else %}bg-gray-100 text-gray-900{% endif %}
+                    {% else %}bg-primary-600 text-white{% endif %}">{{ message.text }}</div>
+
+                <div class="mt-1 text-[11px] text-gray-400 {% if not message.is_bot %}text-right{% endif %}">
+                    {{ message.get_role_display }} · {{ message.created_at|date:"M d, H:i" }}
+                    {% if message.is_bot %}
+                        {% if message.intent %}· rule: <span class="font-mono">{{ message.intent }}</span>{% endif %}
+                        {% if message.tool_names %}· read: <span class="font-mono">{{ message.tool_names|join:", " }}</span>{% endif %}
+                        {% if message.tokens_used %}· {{ message.tokens_used }} tokens{% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="p-8 text-center text-gray-500">This chat is empty.</div>
+        {% endfor %}
+    </div>
+
+    <!-- Why it said that -->
+    {% if quoted_entries %}
+    <div class="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <h2 class="font-semibold text-gray-900 mb-1">Answers quoted in this chat</h2>
+        <p class="text-sm text-gray-500 mb-4">The assistant sent these word for word. Edit one and every future answer changes with it.</p>
+        <div class="space-y-2">
+            {% for entry in quoted_entries %}
+            <div class="flex items-center justify-between gap-3 border border-gray-100 rounded-xl px-4 py-3">
+                <div class="min-w-0">
+                    <div class="text-sm font-semibold text-gray-900 truncate">{{ entry.question }}</div>
+                    <div class="text-xs text-gray-500 truncate">{{ entry.answer|truncatechars:110 }}</div>
+                </div>
+                {% if 'assistant.manage' in admin_perms %}
+                <a href="{% url 'assistant_knowledge_edit' entry.id %}"
+                   class="shrink-0 text-sm font-semibold text-primary-600 hover:text-primary-700">Edit</a>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <p class="mt-6 text-xs text-gray-400">
+        The assistant reads a person's own rows live when it answers, so a figure in an old
+        transcript may no longer be current. The "read:" line says which readers it used.
+    </p>
+</div>
+{% endblock %}

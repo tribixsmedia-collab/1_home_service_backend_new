@@ -1,0 +1,84 @@
+{% extends "dashboard/_layout.html" %}
+
+{% block title %}Ask the assistant{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="mb-4 px-4 py-3 rounded-lg text-sm
+                {% if message.tags == 'error' %}bg-red-50 text-red-700
+                {% elif message.tags == 'warning' %}bg-amber-50 text-amber-800
+                {% else %}bg-green-50 text-green-700{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="mb-6 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
+        <div>
+            <h1 class="text-2xl lg:text-3xl font-bold text-gray-900">Ask the assistant</h1>
+            <p class="text-gray-500 mt-1">Figures only. It reads, it never changes anything.</p>
+        </div>
+        <a href="{% url 'assistant_conversations' %}"
+           class="bg-white border border-gray-300 text-gray-700 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-gray-50">All chats</a>
+    </div>
+
+    {% if not settings_row.admin_enabled %}
+    <div class="mb-5 rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-800">
+        The assistant is switched off for this dashboard.
+        {% if 'assistant.manage' in admin_perms %}
+        <a href="{% url 'assistant_settings' %}" class="font-semibold underline">Switch it on in Settings</a>.
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
+        {% for message in conversation.messages.all %}
+        <div class="flex {% if message.is_bot %}justify-start{% else %}justify-end{% endif %}">
+            <div class="max-w-[85%]">
+                <div class="rounded-2xl px-4 py-3 text-sm whitespace-pre-line
+                    {% if message.is_bot %}
+                        {% if message.is_unanswered %}bg-red-50 border border-red-200 text-red-900{% else %}bg-gray-100 text-gray-900{% endif %}
+                    {% else %}bg-primary-600 text-white{% endif %}">{{ message.text }}</div>
+                <div class="mt-1 text-[11px] text-gray-400 {% if not message.is_bot %}text-right{% endif %}">
+                    {{ message.created_at|date:"M d, H:i" }}
+                    {% if message.is_bot and message.tool_names %}
+                    · read: <span class="font-mono">{{ message.tool_names|join:", " }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="py-8 text-center">
+            <p class="text-sm text-gray-500 mb-4">{{ settings_row.greeting }}</p>
+            <div class="flex gap-2 flex-wrap justify-center">
+                {% for starter in starters %}
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="question" value="{{ starter }}">
+                    <button type="submit"
+                            class="text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50">{{ starter }}</button>
+                </form>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+
+        <form method="post" class="flex gap-2 pt-2 border-t border-gray-100">
+            {% csrf_token %}
+            <input type="text" name="question" maxlength="1000" autofocus
+                   placeholder="How many bookings this week?"
+                   class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+            <button type="submit"
+                    class="bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg">Ask</button>
+        </form>
+    </div>
+
+    <p class="mt-4 text-xs text-gray-400">
+        You are only shown figures your role can reach, so a report you have no permission
+        for says so rather than answering. Every question and answer is kept in
+        <a href="{% url 'assistant_conversations' %}" class="underline">All chats</a>.
+    </p>
+</div>
+{% endblock %}

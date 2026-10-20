@@ -1,0 +1,119 @@
+{% extends "dashboard/_layout.html" %}
+
+{% block title %}Answer book{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="mb-4 px-4 py-3 rounded-lg text-sm
+                {% if message.tags == 'error' %}bg-red-50 text-red-700
+                {% elif message.tags == 'warning' %}bg-amber-50 text-amber-800
+                {% else %}bg-green-50 text-green-700{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <a href="{% url 'assistant_conversations' %}" class="text-sm text-gray-500 hover:text-gray-700">&larr; Back to assistant chats</a>
+
+    <div class="mt-3 mb-6 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
+        <div>
+            <h1 class="text-2xl lg:text-3xl font-bold text-gray-900">Answer book</h1>
+            <p class="text-gray-500 mt-1">
+                The assistant sends these answers word for word. It writes nothing of its own.
+            </p>
+        </div>
+        {% if 'assistant.manage' in admin_perms %}
+        <a href="{% url 'assistant_knowledge_add' %}"
+           class="bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">Add an answer</a>
+        {% endif %}
+    </div>
+
+    {% if draft_count %}
+    <div class="mb-5 rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-800">
+        <span class="font-semibold">{{ draft_count }} answer{{ draft_count|pluralize }} switched off.</span>
+        While an answer is off the assistant says it does not know and offers the person
+        a human instead. That is on purpose for anything it must not improvise, such as
+        cancellation charges or refund windows: write your own wording, then switch it on.
+    </div>
+    {% endif %}
+
+    <div class="flex flex-col lg:flex-row lg:items-center gap-3 mb-6">
+        <div class="flex gap-2 flex-wrap flex-1">
+            {% for value, label in audience_tabs %}
+            <a href="?{% if value %}audience={{ value }}&{% endif %}{% if query %}q={{ query }}{% endif %}"
+               class="px-4 py-2 rounded-lg text-sm font-semibold {% if current_audience == value %}bg-primary-600 text-white{% else %}bg-white text-gray-700 border border-gray-200{% endif %}">{{ label }}</a>
+            {% endfor %}
+        </div>
+        <form method="get" class="flex gap-2">
+            {% if current_audience %}<input type="hidden" name="audience" value="{{ current_audience }}">{% endif %}
+            <input type="text" name="q" value="{{ query }}" placeholder="Search questions and answers"
+                   class="px-4 py-2 border border-gray-300 rounded-lg text-sm w-full lg:w-72 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+            <button type="submit" class="bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold px-4 py-2 rounded-lg">Search</button>
+            {% if query %}
+            <a href="?{% if current_audience %}audience={{ current_audience }}{% endif %}"
+               class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="space-y-3">
+        {% for entry in entries %}
+        <div class="bg-white rounded-2xl shadow-sm border {% if entry.is_active %}border-gray-100{% else %}border-orange-200{% endif %} p-5">
+            <div class="flex items-start justify-between gap-4">
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-1 flex-wrap">
+                        <h2 class="font-semibold text-gray-900">{{ entry.question }}</h2>
+                        <span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full
+                            {% if entry.audience == 'VENDOR' %}bg-purple-100 text-purple-700
+                            {% elif entry.audience == 'CUSTOMER' %}bg-sky-100 text-sky-700
+                            {% else %}bg-gray-100 text-gray-700{% endif %}">
+                            {{ entry.get_audience_display }}
+                        </span>
+                        {% if not entry.is_active %}
+                        <span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">Off</span>
+                        {% endif %}
+                    </div>
+                    <div class="text-sm text-gray-600 whitespace-pre-line">{{ entry.answer }}</div>
+                    {% if entry.keywords %}
+                    <div class="mt-2 flex gap-1 flex-wrap">
+                        {% for word in entry.keyword_list %}
+                        <span class="text-[11px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{{ word }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if 'assistant.manage' in admin_perms %}
+                <div class="shrink-0 flex items-center gap-2">
+                    <form method="post" action="{% url 'assistant_knowledge_toggle' entry.id %}">
+                        {% csrf_token %}
+                        <button type="submit"
+                                class="text-xs font-semibold px-3 py-1.5 rounded-lg border {% if entry.is_active %}border-gray-300 text-gray-600 hover:bg-gray-50{% else %}border-green-300 text-green-700 hover:bg-green-50{% endif %}">
+                            {% if entry.is_active %}Switch off{% else %}Switch on{% endif %}
+                        </button>
+                    </form>
+                    <a href="{% url 'assistant_knowledge_edit' entry.id %}"
+                       class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary-600 text-white hover:bg-primary-700">Edit</a>
+                    <form method="post" action="{% url 'assistant_knowledge_delete' entry.id %}"
+                          onsubmit="return confirm('Delete this answer? The assistant will stop giving it.');">
+                        {% csrf_token %}
+                        <button type="submit" class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50">Delete</button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="bg-white rounded-2xl border border-gray-100 p-12 text-center text-gray-500">
+            {% if query or current_audience %}
+            Nothing matches that.
+            {% else %}
+            The answer book is empty, so the assistant can only answer from live data.
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
