@@ -310,3 +310,121 @@ class VendorAudienceTests(TestCase):
         # VENDOR is a customer's category ("vendor issue"); a vendor's own
         # ticket must not land in it.
         self.assertIn(ticket.category, SupportTicket.VENDOR_CATEGORIES)
+
+
+class ResponseContractTests(TestCase):
+    """
+    The exact keys the Flutter apps read.
+
+    Both apps parse these responses by hand -- `session['greeting']`,
+    `message['is_bot']`, `reply['can_escalate']` -- and a renamed field would
+    not fail here, it would show up as a blank chat bubble in a shipped app
+    that nobody can hotfix. So the key names are pinned, not just the values.
+
+    Adding a key is fine and these tests allow it. Removing or renaming one
+    means an app release, which is what the failure is there to tell you.
+    """
+
+    def setUp(self):
+        AssistantSettings.get_solo()
+        user = User.objects.create_user(
+            username='asha', password='pw', role=User.Role.CUSTOMER)
+        Customer.objects.create(user=user)
+        self.client = APIClient()
+        self.client.force_authenticate(user=user)
+
+    def test_session_carries_what_the_chat_screen_opens_with(self):
+        data = self.client.get(reverse('assistant-session')).data
+        self.assertLessEqual(
+            {'enabled', 'greeting', 'suggestions', 'conversation'},
+            set(data),
+        )
+        self.assertLessEqual(
+            {'id', 'audience', 'is_escalated', 'escalated_ticket',
+             'started_at', 'updated_at', 'messages'},
+            set(data['conversation']),
+        )
+        self.assertIsInstance(data['suggestions'], list)
+
+    def test_a_switched_off_session_carries_only_the_flag(self):
+        """The apps check `enabled` before reaching for `conversation`."""
+        settings_row = AssistantSettings.get_solo()
+        settings_row.customer_enabled = False
+        settings_row.save()
+
+        data = self.client.get(reverse('assistant-session')).data
+        self.assertIs(data['enabled'], False)
+
+    def test_ask_carries_what_a_bubble_needs(self):
+        data = self.client.post(
+            reverse('assistant-ask'), {'question': 'my bookings'},
+        ).data
+        self.assertLessEqual(
+            {'message', 'suggestions', 'can_escalate', 'conversation_id'},
+            set(data),
+        )
+        self.assertLessEqual(
+            {'id', 'role', 'is_bot', 'text', 'created_at'},
+            set(data['message']),
+        )
+        # The apps branch on these two, so their types matter as much as
+        # their names.
+        self.assertIsInstance(data['message']['is_bot'], bool)
+        self.assertIsInstance(data['can_escalate'], bool)
+
+    def test_a_stored_message_reads_back_the_same_way(self):
+        """
+        The session replays history through the same keys a live answer uses.
+
+        Both apps build one `_Turn` type from both, so a transcript loaded on
+        reopen must parse exactly like a reply that just arrived.
+        """
+        self.client.post(reverse('assistant-ask'), {'question': 'my bookings'})
+        session = self.client.get(reverse('assistant-session')).data
+        stored = session['conversation']['messages']
+
+        self.assertEqual(len(stored), 2)
+        for message in stored:
+            self.assertLessEqual(
+                {'id', 'role', 'is_bot', 'text', 'created_at'}, set(message),
+            )
+        self.assertFalse(stored[0]['is_bot'])
+        self.assertTrue(stored[1]['is_bot'])
+
+    def test_the_transcript_never_carries_the_audit_fields(self):
+        """
+        `intent`, `tool_calls` and `tokens_used` are for the dashboard.
+
+        In an app they would only be something to screenshot, and `tool_calls`
+        names the readers behind an answer -- not a thing to hand out.
+        """
+        self.client.post(reverse('assistant-ask'), {'question': 'my bookings'})
+        message = self.client.get(
+            reverse('assistant-session'),
+        ).data['conversation']['messages'][1]
+
+        for field in ('intent', 'engine', 'tool_calls', 'tokens_used'):
+            self.assertNotIn(field, message)
+
+    def test_escalate_carries_the_ticket_the_app_links_to(self):
+        self.client.post(reverse('assistant-ask'), {'question': 'help me'})
+        data = self.client.post(reverse('assistant-escalate')).data
+
+        self.assertLessEqual({'ticket_id', 'subject', 'message'}, set(data))
+        self.assertIsInstance(data['ticket_id'], int)
+
+    def test_a_refused_question_carries_a_sentence_to_show(self):
+        """
+        Both apps show `error` verbatim on a 429, so it has to be a sentence
+        written for the person rather than a code.
+        """
+        settings_row = AssistantSettings.get_solo()
+        settings_row.daily_message_limit = 1
+        settings_row.save()
+
+        self.client.post(reverse('assistant-ask'), {'question': 'hello'})
+        response = self.client.post(reverse('assistant-ask'), {'question': 'hi'})
+
+        self.assertEqual(response.status_code, 429)
+        self.assertIn('error', response.data)
+        self.assertRegex(response.data['error'], r'[a-z]\.')
